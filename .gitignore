@@ -1,0 +1,7 @@
+DiskMounter.app
+*.o
+moc_*
+qrc_*
+.qmake.stash
+Makefile
+*.swp
