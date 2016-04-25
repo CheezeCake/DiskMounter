@@ -54,7 +54,7 @@ bool DiskMounter::execCmd(const char* cmd, const std::vector<char*>& cmdArgs)
 
 	if (child == 0) {
 		execv(cmd, cmdArgs.data());
-		perror(cmdArgs.front());
+		perror(cmd);
 		exit(1);
 	}
 	else {
@@ -70,13 +70,13 @@ void DiskMounter::runUtility(Device& device, const char* utility,
 		const QString& errorMessage, bool mounted, const QString& mountPoint,
 		QAction* before)
 {
-	// disable the menu action during the mount operation
+	// disable the menu action during the {,u}mount operation
 	device.action->setEnabled(false);
 
 	if (execCmd(utility, execArgs)) {
 		QMessageBox::information(nullptr, utility, successMessage);
 
-		// put the device in the "mounted" section of the menu
+		// put the device in the correct section of the menu
 		QString actionText = device.action->text();
 		menu->removeAction(device.action);
 
