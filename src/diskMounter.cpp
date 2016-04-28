@@ -3,6 +3,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <Security/Authorization.h>
+
 #include <QIcon>
 #include <QInputDialog>
 #include <QMessageBox>
@@ -43,26 +45,42 @@ void DiskMounter::runDiskWatcher()
 	diskWatcher.run();
 }
 
+/* bool DiskMounter::execCmd(const char* cmd, const std::vector<char*>& cmdArgs) */
+/* { */
+/* 	const pid_t child = fork(); */
+
+/* 	if (child == -1) { */
+/* 		perror("fork"); */
+/* 		return false; */
+/* 	} */
+
+/* 	if (child == 0) { */
+/* 		execv(cmd, cmdArgs.data()); */
+/* 		perror(cmd); */
+/* 		exit(1); */
+/* 	} */
+/* 	else { */
+/* 		int status; */
+/* 		wait(&status); */
+
+/* 		return (status == 0); */
+/* 	} */
+/* } */
+
 bool DiskMounter::execCmd(const char* cmd, const std::vector<char*>& cmdArgs)
 {
-	const pid_t child = fork();
+	AuthorizationRef authorizationRef;
 
-	if (child == -1) {
-		perror("fork");
+	if (AuthorizationCreate(nullptr, kAuthorizationEmptyEnvironment,
+			kAuthorizationFlagDefaults, &authorizationRef)
+			!= errAuthorizationSuccess)
 		return false;
-	}
 
-	if (child == 0) {
-		execv(cmd, cmdArgs.data());
-		perror(cmd);
-		exit(1);
-	}
-	else {
-		int status;
-		wait(&status);
 
-		return (status == 0);
-	}
+	FILE *pipe = nullptr;
+	return (AuthorizationExecuteWithPrivileges(authorizationRef, cmd,
+			kAuthorizationFlagDefaults, cmdArgs.data(), &pipe)
+			== errAuthorizationSuccess);
 }
 
 void DiskMounter::runUtility(Device& device, const char* utility,
@@ -105,7 +123,7 @@ void DiskMounter::mountDisk(Device& device)
 	const QString mountPoint = QFileDialog::getExistingDirectory(nullptr,
 			"mount point", QDir::homePath());
 	const std::vector<char*> execArgs = {
-		const_cast<char*>(MountUtility),
+		/* const_cast<char*>(MountUtility), */
 		const_cast<char*>("-t"),
 		const_cast<char*>(fsType.toStdString().c_str()),
 		const_cast<char*>(device.deviceNodePath.toStdString().c_str()),
@@ -127,7 +145,7 @@ void DiskMounter::unmountDisk(Device& device)
 	}
 
 	const std::vector<char*> execArgs = {
-		const_cast<char*>(UmountUtility),
+		/* const_cast<char*>(UmountUtility), */
 		const_cast<char*>(device.mountPoint.toStdString().c_str()),
 		nullptr
 	};

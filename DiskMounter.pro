@@ -12,6 +12,6 @@ SOURCES += src/main.cpp src/diskMounter.cpp src/diskWatcher.cpp
 
 HEADERS += src/diskMounter.hpp src/diskWatcher.hpp
 
-LIBS += -framework CoreFoundation -framework DiskArbitration
+LIBS += -framework CoreFoundation -framework DiskArbitration -framework Security
 
 QMAKE_INFO_PLIST = plist/Info.plist
