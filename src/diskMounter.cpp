@@ -77,10 +77,9 @@ bool DiskMounter::execCmd(const char* cmd, const std::vector<char*>& cmdArgs)
 		return false;
 
 
-	FILE *pipe = nullptr;
 	return (AuthorizationExecuteWithPrivileges(authorizationRef, cmd,
-			kAuthorizationFlagDefaults, cmdArgs.data(), &pipe)
-			== errAuthorizationSuccess);
+			kAuthorizationFlagDefaults, cmdArgs.data(),
+			static_cast<FILE**>(nullptr)) == errAuthorizationSuccess);
 }
 
 void DiskMounter::runUtility(Device& device, const char* utility,
