@@ -159,7 +159,7 @@ void DiskMounter::unmountDisk(Device& device)
 
 void DiskMounter::onDiskClicked(QString deviceNodePath)
 {
-	auto& device = devices.at(deviceNodePath);
+	Device& device = devices.at(deviceNodePath);
 
 	if (device.action->isEnabled()) {
 		if (device.mounted) {
