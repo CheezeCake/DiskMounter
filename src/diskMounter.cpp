@@ -1,5 +1,8 @@
 #include <iostream>
 
+#include <sys/mount.h>
+#include <sys/param.h>
+#include <sys/ucred.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -45,52 +48,39 @@ void DiskMounter::runDiskWatcher()
 	diskWatcher.run();
 }
 
-/* bool DiskMounter::execCmd(const char* cmd, const std::vector<char*>& cmdArgs) */
-/* { */
-/* 	const pid_t child = fork(); */
-
-/* 	if (child == -1) { */
-/* 		perror("fork"); */
-/* 		return false; */
-/* 	} */
-
-/* 	if (child == 0) { */
-/* 		execv(cmd, cmdArgs.data()); */
-/* 		perror(cmd); */
-/* 		exit(1); */
-/* 	} */
-/* 	else { */
-/* 		int status; */
-/* 		wait(&status); */
-
-/* 		return (status == 0); */
-/* 	} */
-/* } */
-
 bool DiskMounter::execCmd(const char* cmd, const std::vector<char*>& cmdArgs)
 {
 	AuthorizationRef authorizationRef;
+	FILE* pipe;
+	bool ret = false;
 
 	if (AuthorizationCreate(nullptr, kAuthorizationEmptyEnvironment,
 			kAuthorizationFlagDefaults, &authorizationRef)
 			!= errAuthorizationSuccess)
 		return false;
 
+	if (AuthorizationExecuteWithPrivileges(authorizationRef, cmd,
+			kAuthorizationFlagDefaults, cmdArgs.data(), &pipe)
+			== errAuthorizationSuccess) {
+		while (fgetc(pipe) != EOF)
+			;
 
-	return (AuthorizationExecuteWithPrivileges(authorizationRef, cmd,
-			kAuthorizationFlagDefaults, cmdArgs.data(), nullptr)
-			== errAuthorizationSuccess);
+		ret = true;
+	}
+
+	fclose(pipe);
+	return ret;
 }
 
 void DiskMounter::runUtility(Device& device, const char* utility,
 		const std::vector<char*>& execArgs, const QString& successMessage,
 		const QString& errorMessage, bool mounted, const QString& mountPoint,
-		QAction* before)
+		QAction* before, const std::function<bool()>& success)
 {
 	// disable the menu action during the {,u}mount operation
 	device.action->setEnabled(false);
 
-	if (execCmd(utility, execArgs)) {
+	if (execCmd(utility, execArgs) && success()) {
 		QMessageBox::information(nullptr, utility, successMessage);
 
 		// put the device in the correct section of the menu
@@ -109,6 +99,23 @@ void DiskMounter::runUtility(Device& device, const char* utility,
 	}
 }
 
+bool DiskMounter::isMounted(const char* deviceNodePath,
+		const char* mountPoint)
+{
+	struct statfs* stfs;
+	int n;
+	if ((n = getmntinfo(&stfs, MNT_WAIT)) == 0)
+		return false;
+
+	for (int i = 0; i < n; i++) {
+		if (strcmp(stfs[i].f_mntfromname, deviceNodePath) == 0 &&
+				strcmp(stfs[i].f_mntonname, mountPoint) == 0)
+			return true;
+	}
+
+	return false;
+}
+
 void DiskMounter::mountDisk(Device& device)
 {
 	if (device.mounted) {
@@ -122,7 +129,6 @@ void DiskMounter::mountDisk(Device& device)
 	const QString mountPoint = QFileDialog::getExistingDirectory(nullptr,
 			"mount point", QDir::homePath());
 	const std::vector<char*> execArgs = {
-		/* const_cast<char*>(MountUtility), */
 		const_cast<char*>("-t"),
 		const_cast<char*>(fsType.toStdString().c_str()),
 		const_cast<char*>(device.deviceNodePath.toStdString().c_str()),
@@ -133,7 +139,12 @@ void DiskMounter::mountDisk(Device& device)
 	runUtility(device, MountUtility, execArgs,
 				device.deviceNodePath + " successfully mounted on " + mountPoint,
 				device.deviceNodePath + " mount on " + mountPoint + " failed!",
-				true, mountPoint, quitSeparatorAction);
+				true, mountPoint, quitSeparatorAction,
+				[&device, &mountPoint] {
+					return isMounted(
+							device.deviceNodePath.toStdString().c_str(),
+							mountPoint.toStdString().c_str());
+				});
 }
 
 void DiskMounter::unmountDisk(Device& device)
@@ -144,7 +155,6 @@ void DiskMounter::unmountDisk(Device& device)
 	}
 
 	const std::vector<char*> execArgs = {
-		/* const_cast<char*>(UmountUtility), */
 		const_cast<char*>(device.mountPoint.toStdString().c_str()),
 		nullptr
 	};
@@ -154,7 +164,12 @@ void DiskMounter::unmountDisk(Device& device)
 				device.mountPoint,
 				device.deviceNodePath + " unmount from " + device.mountPoint +
 				" failed!",
-				false, "", mountedSeparatorAction);
+				false, "", mountedSeparatorAction,
+				[&device] {
+					return !isMounted(
+							device.deviceNodePath.toStdString().c_str(),
+							device.mountPoint.toStdString().c_str());
+				});
 }
 
 void DiskMounter::onDiskClicked(QString deviceNodePath)

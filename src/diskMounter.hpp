@@ -58,7 +58,9 @@ class DiskMounter : public QObject
 		void runUtility(Device& device, const char* utility,
 				const std::vector<char*>& execArgs,
 				const QString& successMessage, const QString& errorMessage,
-				bool mounted, const QString& mountPoint, QAction* before);
+				bool mounted, const QString& mountPoint, QAction* before,
+				const std::function<bool()>& success);
+		static bool isMounted(const char* deviceNodePath, const char* mountPoint);
 
 		bool execCmd(const char* cmd, const std::vector<char*>& cmdArgs);
 		void mountDisk(Device& device);
